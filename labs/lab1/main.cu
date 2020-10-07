@@ -29,13 +29,32 @@ int main() {
 	cudaMalloc(&dev_vec2, sizeof(double) * n);
 	cudaMemcpy(dev_vec2, vec2, sizeof(double) * n, cudaMemcpyHostToDevice);
 
+
+	cudaEvent_t start, stop;
+	float time;
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+	cudaEventRecord(start, 0);
+
 	kernel<<<256, 256>>>(dev_res, dev_vec1, dev_vec2, n);
 
-	cudaMemcpy(res, dev_res, sizeof(double) * n, cudaMemcpyDeviceToHost);
+	cudaEventRecord(stop, 0);
+	cudaEventSynchronize(stop);
+	cudaEventElapsedTime(&time, start, stop);
+	fprintf(stderr, "time = %f\n", time);
+	cudaEventDestroy(stop);
+	cudaEventDestroy(start);
+
+
+	// cudaMemcpy(res, dev_res, sizeof(double) * n, cudaMemcpyDeviceToHost);
 	cudaFree(dev_res);
-	for(i = 0; i < n; i++)
-		printf("%f ", res[i]);
-	printf("\n");
+	cudaFree(dev_vec1);
+	cudaFree(dev_vec2);
+	// for(i = 0; i < n; i++)
+	// 	printf("%f ", res[i]);
+	// printf("\n");
 	free(res);
+	free(vec1);
+	free(vec2);
 	return 0;
 }
