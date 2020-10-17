@@ -84,7 +84,21 @@ int main() {
 	uchar4 *dev_out;
 	CSC(cudaMalloc(&dev_out, sizeof(uchar4) * wn * hn));
 
+	cudaEvent_t start, stop;
+  float time;
+  cudaEventCreate(&start);
+  cudaEventCreate(&stop);
+  cudaEventRecord(start, 0);
+
 	kernel<<<dim3(16, 16), dim3(16, 16)>>>(dev_out, wn, hn, wScale, hScale);
+
+	cudaEventRecord(stop, 0);
+  cudaEventSynchronize(stop);
+  cudaEventElapsedTime(&time, start, stop);
+  fprintf(stderr, "%.2f\n", time);
+  cudaEventDestroy(stop);
+  cudaEventDestroy(start);
+
 	CSC(cudaGetLastError());
 
 	CSC(cudaMemcpy(data, dev_out, sizeof(uchar4) * wn * hn, cudaMemcpyDeviceToHost));
