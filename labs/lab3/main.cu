@@ -13,7 +13,7 @@ do {                                \
 } while(0)
 
 
-struct pnt{
+struct pnt {
     int x, y;
 };
 
@@ -37,10 +37,13 @@ int main() {
     vector<vector<pnt>> classes(nc);
     int4 avg[32];
     double cov[32][3][3];
-    for (int i = 0; i < nc; ++i){
+    double cov_inv[32][3][3];
+    double dets[32];
+    for (int i = 0; i < nc; ++i) {
         cin >> np;
         classes[i].resize(np);
-        for(int j = 0; j < np; ++j){
+        // input + count averages
+        for (int j = 0; j < np; ++j) {
             cin >> classes[i][j].x >> classes[i][j].y;
             uchar4 ps = data[classes[i][j].y * w + classes[i][j].x];
             avg[i].x += ps.x;
@@ -51,7 +54,8 @@ int main() {
         avg[i].y /= np;
         avg[i].z /= np;
 
-        for(int j = 0; j < np; ++j){
+        // count cov
+        for (int j = 0; j < np; ++j) {
             uchar4 ps = data[classes[i][j].y * w + classes[i][j].x];
 
 
@@ -60,26 +64,46 @@ int main() {
             diff[1] = ps.y - avg[i].y;
             diff[2] = ps.z - avg[i].z;
 
-            for(int k = 0; k < 3; ++k){
-                for(int m = 0; m < 3; ++m) {
+            for (int k = 0; k < 3; ++k) {
+                for (int m = 0; m < 3; ++m) {
                     cov[i][k][m] += diff[k] * diff[m];
                 }
             }
         }
-
-        for(int k = 0; k < 3; ++k){
-            for(int m = 0; m < 3; ++m) {
+        for (int k = 0; k < 3; ++k) {
+            for (int m = 0; m < 3; ++m) {
                 cov[i][k][m] /= (np - 1);
             }
         }
+
+        // count cov_inverse + determinants
+        double det = cov[i][0][0] * (cov[i][1][1] * cov[i][2][2] - cov[i][2][1] * cov[i][1][2])
+                     - cov[i][0][1] * (cov[i][1][0] * cov[i][2][2] - cov[i][2][0] * cov[i][1][2])
+                     + cov[i][0][2] * (cov[i][1][0] * cov[i][2][1] - cov[i][2][0] * cov[i][1][1]);
+
+
+        cov_inv[i][0][0] = (cov[i][1][1] * cov[i][2][2] - cov[i][2][1] * cov[i][1][2]) / det;
+        cov_inv[i][1][0] = -(cov[i][1][0] * cov[i][2][2] - cov[i][2][0] * cov[i][1][2]) / det;
+        cov_inv[i][2][0] = (cov[i][1][0] * cov[i][2][1] - cov[i][2][0] * cov[i][1][1]) / det;
+
+        cov_inv[i][0][1] = -(cov[i][0][1] * cov[i][2][2] - cov[i][2][1] * cov[i][0][2]) / det;
+        cov_inv[i][1][1] = (cov[i][0][0] * cov[i][2][2] - cov[i][2][0] * cov[i][0][2]) / det;
+        cov_inv[i][2][1] = -(cov[i][0][0] * cov[i][2][1] - cov[i][2][0] * cov[i][0][1]) / det;
+
+        cov_inv[i][0][2] = (cov[i][0][1] * cov[i][1][2] - cov[i][1][1] * cov[i][0][2]) / det;
+        cov_inv[i][1][2] = -(cov[i][0][0] * cov[i][1][2] - cov[i][1][0] * cov[i][0][2]) / det;
+        cov_inv[i][2][2] = (cov[i][0][0] * cov[i][1][1] - cov[i][1][0] * cov[i][0][1]) / det;
+
+        dets[i] = det;
     }
 
 
-    for (int y = 0; y < h; ++y){
-        for (int x = 0; x < w; ++x){
-            uchar4 ps = data[y * w + x];
-        }
-    }
+
+//    for (int y = 0; y < h; ++y){
+//        for (int x = 0; x < w; ++x){
+//            uchar4 ps = data[y * w + x];
+//        }
+//    }
 
 
 
