@@ -21,22 +21,6 @@ struct pnt {
 };
 
 
-//__global__ void kernel(uchar4 *out, int w, int h, int nc) {
-//    int idx = blockDim.x * blockIdx.x + threadIdx.x;
-//    int idy = blockDim.y * blockIdx.y + threadIdx.y;
-//    int offsetx = blockDim.x * gridDim.x;
-//    int offsety = blockDim.y * gridDim.y;
-//    int x, y;
-//
-//
-//
-//    for(y = idy; y < h; y += offsety) {
-//        for(x = idx; x < w; x += offsetx) {
-//
-//
-//        }
-//    }
-//}
 
 int main() {
 
@@ -119,6 +103,11 @@ int main() {
     }
 
 
+    cudaEvent_t start, stop;
+    float time;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start, 0);
 
     for (int y = 0; y < h; ++y){
         for (int x = 0; x < w; ++x){
@@ -156,6 +145,12 @@ int main() {
         }
     }
 
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&time, start, stop);
+    fprintf(stderr, "%.2f\n", time);
+    cudaEventDestroy(stop);
+    cudaEventDestroy(start);
 
 
     fp = fopen(outputFile, "wb");
