@@ -4,6 +4,9 @@ using namespace std;
 
 const int MAXX = 1e8;
 
+__constant__ int4 avg_dev[32];
+__constant__ double cov_inv_dev[32][3][3];
+__constant__ double dets_dev[32];
 
 #define CSC(call)                            \
 do {                                \
@@ -21,22 +24,53 @@ struct pnt {
 };
 
 
-//__global__ void kernel(uchar4 *out, int w, int h, int nc) {
-//    int idx = blockDim.x * blockIdx.x + threadIdx.x;
-//    int idy = blockDim.y * blockIdx.y + threadIdx.y;
-//    int offsetx = blockDim.x * gridDim.x;
-//    int offsety = blockDim.y * gridDim.y;
-//    int x, y;
-//
-//
-//
-//    for(y = idy; y < h; y += offsety) {
-//        for(x = idx; x < w; x += offsetx) {
-//
-//
-//        }
-//    }
-//}
+__global__ void kernel(uchar4 *data, int w, int h, int nc) {
+    int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    int idy = blockDim.y * blockIdx.y + threadIdx.y;
+    int offsetx = blockDim.x * gridDim.x;
+    int offsety = blockDim.y * gridDim.y;
+    int x, y, i, j, k;
+    uchar4 ps;
+
+
+
+    for(y = idy; y < h; y += offsety) {
+        for(x = idx; x < w; x += offsetx) {
+            ps = data[y * w + x];
+
+            double mx = -MAXX;
+            int idx = -1;
+            for (i = 0; i < nc; ++i){
+
+                int diff[3];
+                diff[0] = ps.x - avg_dev[i].x;
+                diff[1] = ps.y - avg_dev[i].y;
+                diff[2] = ps.z - avg_dev[i].z;
+
+                double tmp[3];
+                for(j = 0; j < 3; ++j){
+                    tmp[j] = 0;
+                    for(k = 0; k < 3; ++k){
+                        tmp[j] += (diff[k] * cov_inv_dev[i][k][j]);
+                    }
+                }
+                double ans = 0;
+                for(j = 0; j < 3; ++j){
+                    ans += (tmp[j] * diff[j]);
+                }
+                ans = -ans - log(abs(dets_dev[i]));
+
+                if(ans > mx){
+                    mx = ans;
+                    idx = i;
+                }
+            }
+
+            data[y * w + x].w = idx;
+
+        }
+    }
+}
 
 int main() {
 
@@ -118,44 +152,17 @@ int main() {
         dets[i] = det;
     }
 
+    uchar4 *dev_data;
+    CSC(cudaMalloc(&dev_data, sizeof(uchar4) * w * h));
+    CSC(cudaMemcpy(dev_data, data, sizeof(uchar4) * w * h, cudaMemcpyHostToDevice));
 
+    CSC(cudaMemcpyToSymbol(avg_dev, avg, sizeof(double) * 32 * 3));
+    CSC(cudaMemcpyToSymbol(cov_inv_dev, cov_inv, sizeof(double) * 32 * 3 * 3));
+    CSC(cudaMemcpyToSymbol(dets_dev, dets, sizeof(double) * 32));
 
-    for (int y = 0; y < h; ++y){
-        for (int x = 0; x < w; ++x){
-            uchar4 ps = data[y * w + x];
+    kernel<<<dim3(16, 16), dim3(16, 16)>>>(dev_data, w, h, nc);
 
-            double mx = -MAXX;
-            int idx = -1;
-            for (int i = 0; i < nc; ++i){
-
-                int diff[3];
-                diff[0] = ps.x - avg[i].x;
-                diff[1] = ps.y - avg[i].y;
-                diff[2] = ps.z - avg[i].z;
-
-                double tmp[3];
-                for(int j = 0; j < 3; ++j){
-                    tmp[j] = 0;
-                    for(int k = 0; k < 3; ++k){
-                        tmp[j] += (diff[k] * cov_inv[i][k][j]);
-                    }
-                }
-                double ans = 0;
-                for(int j = 0; j < 3; ++j){
-                    ans += (tmp[j] * diff[j]);
-                }
-                ans = -ans - log(abs(dets[i]));
-
-                if(ans > mx){
-                    mx = ans;
-                    idx = i;
-                }
-            }
-
-            data[y * w + x].w = idx;
-        }
-    }
-
+    CSC(cudaMemcpy(data, dev_data, sizeof(uchar4) * h * w, cudaMemcpyDeviceToHost));
 
 
     fp = fopen(outputFile, "wb");
@@ -164,6 +171,7 @@ int main() {
     fwrite(data, sizeof(uchar4), w * h, fp);
     fclose(fp);
 
+    cudaFree(dev_data);
     free(data);
     return 0;
 }
