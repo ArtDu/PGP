@@ -94,16 +94,22 @@ int main() {
         cin >> np;
         classes[i].resize(np);
         // input + counting averages
+        long long xx = 0, yy = 0, zz = 0;
         for (int j = 0; j < np; ++j) {
             cin >> classes[i][j].x >> classes[i][j].y;
             uchar4 ps = data[classes[i][j].y * w + classes[i][j].x];
-            avg[i].x += ps.x;
-            avg[i].y += ps.y;
-            avg[i].z += ps.z;
+            xx += ps.x;
+            yy += ps.y;
+            zz += ps.z;
         }
-        avg[i].x /= np;
-        avg[i].y /= np;
-        avg[i].z /= np;
+        xx /= np;
+        avg[i].x = xx;
+        yy /= np;
+        avg[i].y = yy;
+        zz /= np;
+        avg[i].z = zz;
+        
+        cout << avg[i].x << " " << avg[i].y << " " << avg[i].z << "\n"; 
 
         // counting cov
         for (int j = 0; j < np; ++j) {
