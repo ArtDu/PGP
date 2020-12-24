@@ -4,4 +4,4 @@ project(main)
 set(CMAKE_CXX_COMPILER  /usr/bin/mpic++)
 
 # add the executable
-add_executable(main samples/sample_mpi.cpp)
+add_executable(main main.cpp)
