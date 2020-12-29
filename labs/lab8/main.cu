@@ -1,24 +1,111 @@
 #include <bits/stdc++.h>
 #include <algorithm>
-#include "/usr/lib/openmpi/include/mpi.h"
+#include "mpi/mpi.h"
+#include <thrust/extrema.h>
+#include <thrust/device_vector.h>
+
+#define CSC(call)                           \
+do {                                \
+  cudaError_t res = call;                     \
+  if (res != cudaSuccess) {                   \
+    fprintf(stderr, "ERROR in %s:%d. Message: %s\n",      \
+        __FILE__, __LINE__, cudaGetErrorString(res));   \
+    exit(0);                          \
+  }                               \
+} while(0)
+
+int id, ib, jb, kb, nbx, nby, nbz, nx, ny, nz;
 
 // Индексация внутри блока
 // из 3d табличного представления в 1d одиночный массив
 #define _i(i, j, k) (((k) + 1) * (ny + 2) * (nx + 2) + ((j) + 1) * (nx + 2) + (i) + 1)
+#define _ixy(i, j) ((j) * nx + (i))
+#define _ixz(i, k) ((k) * nx + (i))
+#define _iyz(j, k) ((k) * ny + (j))
 
 // Индексация по блокам (процессам)
 #define _ib(i, j, k) ((k) * nby * nbx + (j) * nbx + (i))
+
 
 #define _ibz(id) ((id) / nby / nbx)
 #define _iby(id) (((id) % (nby * nbx)) / nbx)
 #define _ibx(id) ((id) % nbx)
 
+__global__ void kernel_copy_yz(double *plane_yz, double *data, int nx, int ny, int nz, int i, int dir, int bc) {
+    int idy = blockIdx.y + blockDim.y + threadIdx.y;
+    int idx = blockIdx.x + blockDim.x + threadIdx.x;
+    int offsety = blockDim.y + gridDim.y;
+    int offsetx = blockDim.x + gridDim.x;
+    int j, k;
+    if (dir) {
+        for (k = idy; k < nz; k += offsety)
+            for (j = idx; j < ny; j += offsetx)
+                plane_yz[_iyz(j, k)] = data[_ib(i, j, k)];
+    } else {
+        if (plane_yz) {
+            for (k = idy; k < nz; k += offsety)
+                for (j = idx; j < ny; j += offsetx)
+                    data[_ib(i, j, k)] = plane_yz[_iyz(j, k)];
+        } else {
+            for (k = idy; k < nz; k += offsety)
+                for (j = idx; j < ny; j += offsetx)
+                    data[_ib(i, j, k)] = bc;
+        }
+    }
+}
+
+__global__ void kernel_copy_xz(double *plane_xz, double *data, int nx, int ny, int nz, int j, int dir, int bc) {
+    int idy = blockIdx.y + blockDim.y + threadIdx.y;
+    int idx = blockIdx.x + blockDim.x + threadIdx.x;
+    int offsety = blockDim.y + gridDim.y;
+    int offsetx = blockDim.x + gridDim.x;
+    int i, k;
+    if (dir) {
+        for (k = idy; k < nz; k += offsety)
+            for (i = idx; i < nx; i += offsetx)
+                plane_xz[_ixz(i, k)] = data[_ib(i, j, k)];
+    } else {
+        if (plane_xz) {
+            for (k = idy; k < nz; k += offsety)
+                for (i = idx; i < nx; i += offsetx)
+                    data[_ib(i, j, k)] = plane_xz[_ixz(i, k)];
+        } else {
+            for (k = idy; k < nz; k += offsety)
+                for (i = idx; i < nx; i += offsetx)
+                    data[_ib(i, j, k)] = bc;
+        }
+    }
+}
+
+__global__ void kernel_copy_xy(double *plane_xy, double *data, int nx, int ny, int nz, int k, int dir, int bc) {
+    int idy = blockIdx.y + blockDim.y + threadIdx.y;
+    int idx = blockIdx.x + blockDim.x + threadIdx.x;
+    int offsety = blockDim.y + gridDim.y;
+    int offsetx = blockDim.x + gridDim.x;
+    int i, j;
+    if (dir) {
+        for (j = idy; j < ny; j += offsety)
+            for (i = idx; i < nx; i += offsetx)
+                plane_xy[_ixy(i, j)] = data[_ib(i, j, k)];
+    } else {
+        if (plane_xy) {
+            for (j = idy; j < ny; j += offsety)
+                for (i = idx; i < nx; i += offsetx)
+                    data[_ib(i, j, k)] = plane_xy[_ixy(i, j)];
+        } else {
+            for (j = idy; j < ny; j += offsety)
+                for (i = idx; i < nx; i += offsetx)
+                    data[_ib(i, j, k)] = bc;
+        }
+    }
+}
+
 int main(int argc, char *argv[]) {
     std::ios_base::sync_with_stdio(false);
-    //std::cin.tie(nullptr);
+//    std::cin.tie(nullptr);
 //    std::cout.tie(nullptr);
 
-    int id, ib, jb, kb, nbx, nby, nbz, nx, ny, nz;
+
     int i, j, k;
     int numproc, proc_name_len;
     char proc_name[MPI_MAX_PROCESSOR_NAME];
@@ -160,7 +247,6 @@ int main(int argc, char *argv[]) {
                 for (j = 0; j < ny; ++j)
                     data[_i(nx, j, k)] = bc_right;
         }
-
 
 
         if (jb > 0) {
