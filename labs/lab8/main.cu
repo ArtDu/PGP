@@ -1,6 +1,6 @@
 #include <bits/stdc++.h>
 #include <algorithm>
-#include "mpi/mpi.h"
+#include <mpi.h>
 #include <thrust/extrema.h>
 #include <thrust/device_vector.h>
 
@@ -31,10 +31,10 @@ do {                                \
 #define _ibx(id) ((id) % nbx)
 
 __global__ void kernel_copy_yz(double *plane_yz, double *data, int nx, int ny, int nz, int i, int dir, int bc) {
-    int idy = blockIdx.y + blockDim.y + threadIdx.y;
-    int idx = blockIdx.x + blockDim.x + threadIdx.x;
-    int offsety = blockDim.y + gridDim.y;
-    int offsetx = blockDim.x + gridDim.x;
+    int idy = blockIdx.y * blockDim.y + threadIdx.y;
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int offsety = blockDim.y * gridDim.y;
+    int offsetx = blockDim.x * gridDim.x;
     int j, k;
     if (dir) {
         for (k = idy; k < nz; k += offsety)
@@ -54,10 +54,10 @@ __global__ void kernel_copy_yz(double *plane_yz, double *data, int nx, int ny, i
 }
 
 __global__ void kernel_copy_xz(double *plane_xz, double *data, int nx, int ny, int nz, int j, int dir, int bc) {
-    int idy = blockIdx.y + blockDim.y + threadIdx.y;
-    int idx = blockIdx.x + blockDim.x + threadIdx.x;
-    int offsety = blockDim.y + gridDim.y;
-    int offsetx = blockDim.x + gridDim.x;
+    int idy = blockIdx.y * blockDim.y + threadIdx.y;
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int offsety = blockDim.y * gridDim.y;
+    int offsetx = blockDim.x * gridDim.x;
     int i, k;
     if (dir) {
         for (k = idy; k < nz; k += offsety)
@@ -77,10 +77,10 @@ __global__ void kernel_copy_xz(double *plane_xz, double *data, int nx, int ny, i
 }
 
 __global__ void kernel_copy_xy(double *plane_xy, double *data, int nx, int ny, int nz, int k, int dir, int bc) {
-    int idy = blockIdx.y + blockDim.y + threadIdx.y;
-    int idx = blockIdx.x + blockDim.x + threadIdx.x;
-    int offsety = blockDim.y + gridDim.y;
-    int offsetx = blockDim.x + gridDim.x;
+    int idy = blockIdx.y * blockDim.y + threadIdx.y;
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int offsety = blockDim.y * gridDim.y;
+    int offsetx = blockDim.x * gridDim.x;
     int i, j;
     if (dir) {
         for (j = idy; j < ny; j += offsety)
@@ -100,12 +100,12 @@ __global__ void kernel_copy_xy(double *plane_xy, double *data, int nx, int ny, i
 }
 
 __global__ void kernel(double *next, double *data, int nx, int ny, int nz, double hx, double hy, double hz) {
-    int idz = blockIdx.z + blockDim.z + threadIdx.z;
-    int idy = blockIdx.y + blockDim.y + threadIdx.y;
-    int idx = blockIdx.x + blockDim.x + threadIdx.x;
-    int offsetz = blockDim.z + gridDim.z;
-    int offsety = blockDim.y + gridDim.y;
-    int offsetx = blockDim.x + gridDim.x;
+    int idz = blockIdx.z * blockDim.z + threadIdx.z;
+    int idy = blockIdx.y * blockDim.y + threadIdx.y;
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int offsetz = blockDim.z * gridDim.z;
+    int offsety = blockDim.y * gridDim.y;
+    int offsetx = blockDim.x * gridDim.x;
     int i, j, k;
     for (i = idx; i < nx; i += offsetx)
         for (j = idy; j < ny; j += offsety)
@@ -118,17 +118,17 @@ __global__ void kernel(double *next, double *data, int nx, int ny, int nz, doubl
 }
 
 __global__ void kernel_error(double *next, double *data, int nx, int ny, int nz) {
-    int idz = blockIdx.z + blockDim.z + threadIdx.z;
-    int idy = blockIdx.y + blockDim.y + threadIdx.y;
-    int idx = blockIdx.x + blockDim.x + threadIdx.x;
-    int offsetz = blockDim.z + gridDim.z;
-    int offsety = blockDim.y + gridDim.y;
-    int offsetx = blockDim.x + gridDim.x;
+    int idz = blockIdx.z * blockDim.z + threadIdx.z;
+    int idy = blockIdx.y * blockDim.y + threadIdx.y;
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int offsetz = blockDim.z * gridDim.z;
+    int offsety = blockDim.y * gridDim.y;
+    int offsetx = blockDim.x * gridDim.x;
     int i, j, k;
     for (i = idx - 1; i < nx + 1; i += offsetx)
         for (j = idy - 1; j < ny + 1; j += offsety)
             for (k = idz - 1; k < nz + 1; k += offsetz) {
-                next[_i(i, j, k)] = ((i != -1 && j != -1 && k != -1 && i != nx && j != ny && k != nz))
+                data[_i(i, j, k)] = ((i != -1 && j != -1 && k != -1 && i != nx && j != ny && k != nz))
                                     * fabs(next[_i(i, j, k)] - data[_i(i, j, k)]);
             }
 }
@@ -138,13 +138,13 @@ int main(int argc, char *argv[]) {
 //    std::cin.tie(nullptr);
 //    std::cout.tie(nullptr);
 
-    int id, ib, jb, kb, nbx, nby, nbz, nx, ny, nz;
+    int id, ib, jb, kb, nbx, nby, nbz, nx, ny, nz, it = 0;
     int i, j, k;
     int numproc, proc_name_len;
     char proc_name[MPI_MAX_PROCESSOR_NAME];
     double lx, ly, lz, hx, hy, hz, bc_down, bc_up, bc_left, bc_right, bc_front, bc_back, eps, diff, u_0;
-    double *data, *temp, *next, *buff, *plane_xy, *plane_xz, *plane_yz;
-    double *dev_data, *dev_next, *dev_plane_xy, *dev_plane_xz, *dev_plane_yz;
+    double *data, *temp, *next, *buff;
+    double *dev_data, *dev_next, *dev_buff;
 
     std::string file_name;
 
@@ -194,17 +194,14 @@ int main(int argc, char *argv[]) {
     int _size_b = (nx + 2) * (ny + 2) * (nz + 2);
     int _size_plane = (std::max(nx, std::max(ny, nz)) * std::max(nx, std::max(ny, nz)) + 2);
     data = (double *) malloc(sizeof(double) * _size_b);
+    double *_data = (double *) malloc(sizeof(double) * _size_b);
     next = (double *) malloc(sizeof(double) * _size_b);
     buff = (double *) malloc(sizeof(double) * _size_plane);
-    plane_xz = (double *) malloc(sizeof(double) * _size_plane);
-    plane_xy = (double *) malloc(sizeof(double) * _size_plane);
-    plane_yz = (double *) malloc(sizeof(double) * _size_plane);
 
     CSC(cudaMalloc(&dev_data, sizeof(double) * _size_b));
     CSC(cudaMalloc(&dev_next, sizeof(double) * _size_b));
-    CSC(cudaMalloc(&dev_plane_xz, sizeof(double) * _size_plane));
-    CSC(cudaMalloc(&dev_plane_xy, sizeof(double) * _size_plane));
-    CSC(cudaMalloc(&dev_plane_yz, sizeof(double) * _size_plane));
+    CSC(cudaMalloc(&dev_buff, sizeof(double) * _size_plane));
+
 
     for (i = 0; i < nx; i++)          // Инициализация блока
         for (j = 0; j < ny; j++)
@@ -216,164 +213,272 @@ int main(int argc, char *argv[]) {
     dim3 blocks(32, 32);
     dim3 threads(32, 32);
 
-    for (; true;) {
+    for (; true; it++) {
         diff = 0;
 
 // Отправка данных и прием в перемешку
 
         if (ib + 1 < nbx) {
-//            kernel_copy_yz<<<blocks, threads>>> (dev_plane_yz, dev_data, nx, ny, nz, nx - 1, true, 0.0);
-//            CSC(cudaGetLastError());
-//            CSC(cudaMemcpy(buff, dev_plane_yz, sizeof(double) * _size_plane, cudaMemcpyDeviceToHost));
-            for (k = 0; k < nz; ++k)
-                for (j = 0; j < ny; j++)
-                    buff[k * ny + j] = data[_i(nx - 1, j, k)];
+            kernel_copy_yz<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, nx - 1, true, 0.0);
+            CSC(cudaGetLastError());
+            CSC(cudaMemcpy(buff, dev_buff, sizeof(double) * _size_plane, cudaMemcpyDeviceToHost));
+//            for (k = 0; k < nz; ++k)
+//                for (j = 0; j < ny; j++) {
+//                    std::cerr << buff[_iyz(j, k)] << " " << data[_i(nx - 1, j, k)] << "\n";
+//                    buff[_iyz(j, k)] = data[_i(nx - 1, j, k)];
+//                }
             MPI_Send(buff, ny * nz, MPI_DOUBLE, _ib(ib + 1, jb, kb), id, MPI_COMM_WORLD);
         }
 
         if (ib > 0) {
             MPI_Recv(buff, ny * nz, MPI_DOUBLE, _ib(ib - 1, jb, kb), _ib(ib - 1, jb, kb),
                      MPI_COMM_WORLD, &status);
-            for (k = 0; k < nz; ++k)
-                for (j = 0; j < ny; j++)
-                    data[_i(-1, j, k)] = buff[k * ny + j];
+            CSC(cudaMemcpy(dev_buff, buff, sizeof(double) * _size_plane, cudaMemcpyHostToDevice));
+            kernel_copy_yz<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, -1, false, 0.0);
+//            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
+//            for (k = 0; k < nz; ++k)
+//                for (j = 0; j < ny; j++) {
+//                    std::cerr << _data[_i(-1, j, k)] << " " << buff[_iyz(j, k)] << "\n";
+//                    data[_i(-1, j, k)] = buff[_iyz(j, k)];
+//                }
         } else {
-            for (k = 0; k < nz; ++k)
-                for (j = 0; j < ny; j++)
-                    data[_i(-1, j, k)] = bc_left;
+            kernel_copy_yz<<<blocks, threads>>> (NULL, dev_data, nx, ny, nz, -1, false, bc_left);
+//            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
+//            for (k = 0; k < nz; ++k)
+//                for (j = 0; j < ny; j++) {
+//                    if(_data[_i(-1, j, k)] != bc_left)
+//                        std::cerr << "bc_left: " << _data[_i(-1, j, k)] << " " << bc_left << "\n";
+//                    data[_i(-1, j, k)] = bc_left;
+//                }
         }
 
         if (jb + 1 < nby) {
-//            kernel_copy_xz<<<blocks, threads>>> (dev_plane_xz, dev_data, nx, ny, nz, ny - 1, true, 0.0);
-//            CSC(cudaGetLastError());
-//            CSC(cudaMemcpy(buff, dev_plane_xz, sizeof(double) * _size_plane, cudaMemcpyDeviceToHost));
-            for (k = 0; k < nz; ++k)
-                for (i = 0; i < nx; i++)
-                    buff[k * nx + i] = data[_i(i, ny - 1, k)];
+            kernel_copy_xz<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, ny - 1, true, 0.0);
+            CSC(cudaGetLastError());
+            CSC(cudaMemcpy(buff, dev_buff, sizeof(double) * _size_plane, cudaMemcpyDeviceToHost));
+//            for (k = 0; k < nz; ++k)
+//                for (i = 0; i < nx; i++) {
+//                    std::cerr << buff[_ixz(i, k)] << " " << data[_i(i, ny - 1, k)] << "\n";
+//                    buff[_ixz(i, k)] = data[_i(i, ny - 1, k)];
+//                }
             MPI_Send(buff, nz * nx, MPI_DOUBLE, _ib(ib, jb + 1, kb), id, MPI_COMM_WORLD);
         }
 
         if (jb > 0) {
             MPI_Recv(buff, nx * nz, MPI_DOUBLE, _ib(ib, jb - 1, kb), _ib(ib, jb - 1, kb),
                      MPI_COMM_WORLD, &status);
-            for (k = 0; k < nz; ++k)
-                for (i = 0; i < nx; i++)
-                    data[_i(i, -1, k)] = buff[k * nx + i];
+            CSC(cudaMemcpy(dev_buff, buff, sizeof(double) * _size_plane, cudaMemcpyHostToDevice));
+            kernel_copy_xz<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, -1, false, 0.0);
+//            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
+//            for (k = 0; k < nz; ++k)
+//                for (i = 0; i < nx; i++) {
+//                    std::cerr << _data[_i(i, -1, k)] << " " << buff[_ixz(i, k)] << "\n";
+//                    data[_i(i, -1, k)] = buff[_ixz(i, k)];
+//                }
         } else {
-            for (k = 0; k < nz; ++k)
-                for (i = 0; i < nx; i++)
-                    data[_i(i, -1, k)] = bc_front;
+            kernel_copy_xz<<<blocks, threads>>> (NULL, dev_data, nx, ny, nz, -1, false, bc_front);
+//            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
+//            for (k = 0; k < nz; ++k)
+//                for (i = 0; i < nx; i++) {
+//                    if(_data[_i(i, -1, k)] != bc_front)
+//                        std::cerr << "bc_front: " << _data[_i(i, -1, k)] << " " << bc_front << "\n";
+//                    data[_i(i, -1, k)] = bc_front;
+//                }
         }
 
         if (kb + 1 < nbz) {
-//            CSC(cudaMemcpy(dev_data, data, sizeof(double) * _size_b, cudaMemcpyHostToDevice));
-//            kernel_copy_xy<<<blocks, threads>>> (dev_plane_xy, dev_data, nx, ny, nz, nz - 1, true, 0.0);
-//            CSC(cudaGetLastError());
-//            CSC(cudaMemcpy(buff, dev_plane_xy, sizeof(double) * _size_plane, cudaMemcpyDeviceToHost));
-            for (j = 0; j < ny; ++j)
-                for (i = 0; i < nx; i++)
-                    buff[j * nx + i] = data[_i(i, j, nz - 1)];
+            kernel_copy_xy<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, nz - 1, true, 0.0);
+            CSC(cudaGetLastError());
+            CSC(cudaMemcpy(buff, dev_buff, sizeof(double) * _size_plane, cudaMemcpyDeviceToHost));
+//            for (j = 0; j < ny; ++j)
+//                for (i = 0; i < nx; i++) {
+//                    if(buff[_ixy(i, j)] != data[_i(i, j, nz - 1)])
+//                        std::cerr << buff[_ixy(i, j)] << " " << data[_i(i, j, nz - 1)] << "\n";
+//                    buff[_ixy(i, j)] = data[_i(i, j, nz - 1)];
+//                }
             MPI_Send(buff, ny * nx, MPI_DOUBLE, _ib(ib, jb, kb + 1), id, MPI_COMM_WORLD);
         }
 
         if (kb > 0) {
             MPI_Recv(buff, nx * ny, MPI_DOUBLE, _ib(ib, jb, kb - 1), _ib(ib, jb, kb - 1),
                      MPI_COMM_WORLD, &status);
-            for (j = 0; j < ny; ++j)
-                for (i = 0; i < nx; i++)
-                    data[_i(i, j, -1)] = buff[j * nx + i];
+            CSC(cudaMemcpy(dev_buff, buff, sizeof(double) * _size_plane, cudaMemcpyHostToDevice));
+            kernel_copy_xy<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, -1, false, 0.0);
+//            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
+//            for (j = 0; j < ny; ++j)
+//                for (i = 0; i < nx; i++) {
+//                    if(_data[_i(i, j, -1)] != buff[_ixy(i, j)]) {
+//                        std::cerr << _data[_i(i, j, -1)] << " " << buff[_ixy(i, j)] << "\n";
+//                    }
+//                    data[_i(i, j, -1)] = buff[_ixy(i, j)];
+//                }
         } else {
-            for (j = 0; j < ny; ++j)
-                for (i = 0; i < nx; ++i)
-                    data[_i(i, j, -1)] = bc_down;
+            kernel_copy_xy<<<blocks, threads>>> (NULL, dev_data, nx, ny, nz, -1, false, bc_down);
+//            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
+//            for (j = 0; j < ny; ++j)
+//                for (i = 0; i < nx; ++i) {
+//                    if(_data[_i(i, j, -1)] != bc_down) {
+//                        std::cerr << _data[_i(i, j, -1)] << " " << bc_down << "\n";
+//                    }
+//                    data[_i(i, j, -1)] = bc_down;
+//                }
         }
 
         if (ib > 0) {
-//            kernel_copy_yz<<<blocks, threads>>> (dev_plane_yz, dev_data, nx, ny, nz, 0, true, 0.0);
-//            CSC(cudaGetLastError());
-//            CSC(cudaMemcpy(buff, dev_plane_yz, sizeof(double) * _size_plane, cudaMemcpyDeviceToHost));
-            for (k = 0; k < nz; ++k)
-                for (j = 0; j < ny; j++)
-                    buff[k * ny + j] = data[_i(0, j, k)];
+            kernel_copy_yz<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, 0, true, 0.0);
+            CSC(cudaGetLastError());
+            CSC(cudaMemcpy(buff, dev_buff, sizeof(double) * _size_plane, cudaMemcpyDeviceToHost));
+//            for (k = 0; k < nz; ++k)
+//                for (j = 0; j < ny; j++) {
+//                    if(buff[_iyz(j, k)] != data[_i(0, j, k)])
+//                        std::cerr << buff[_iyz(j, k)] << " " << data[_i(0, j, k)] << "\n";
+//                    buff[_iyz(j, k)] = data[_i(0, j, k)];
+//                }
             MPI_Send(buff, nz * ny, MPI_DOUBLE, _ib(ib - 1, jb, kb), id, MPI_COMM_WORLD);
         }
 
         if (ib + 1 < nbx) {
             MPI_Recv(buff, ny * nz, MPI_DOUBLE, _ib(ib + 1, jb, kb), _ib(ib + 1, jb, kb),
                      MPI_COMM_WORLD, &status);
-            for (k = 0; k < nz; ++k)
-                for (j = 0; j < ny; j++)
-                    data[_i(nx, j, k)] = buff[k * ny + j];
+            CSC(cudaMemcpy(dev_buff, buff, sizeof(double) * _size_plane, cudaMemcpyHostToDevice));
+            kernel_copy_yz<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, nx, false, 0.0);
+//            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
+//            for (k = 0; k < nz; ++k)
+//                for (j = 0; j < ny; j++) {
+//                    if (_data[_i(nx, j, k)] != buff[_iyz(j, k)]) {
+//                        std::cerr << _data[_i(nx, j, k)] << " " << buff[_iyz(j, k)] << "\n";
+//                    }
+//                    data[_i(nx, j, k)] = buff[_iyz(j, k)];
+//                }
         } else {
-            for (k = 0; k < nz; ++k)
-                for (j = 0; j < ny; ++j)
-                    data[_i(nx, j, k)] = bc_right;
+            kernel_copy_yz<<<blocks, threads>>> (NULL, dev_data, nx, ny, nz, nx, false, bc_right);
+//            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
+//            for (k = 0; k < nz; ++k)
+//                for (j = 0; j < ny; ++j) {
+//                    if (_data[_i(nx, j, k)] != bc_right) {
+//                        std::cerr << _data[_i(nx, j, k)] << " " << bc_right << "\n";
+//                    }
+//                    data[_i(nx, j, k)] = bc_right;
+//                }
         }
 
 
         if (jb > 0) {
-//            kernel_copy_xz<<<blocks, threads>>> (dev_plane_xz, dev_data, nx, ny, nz, 0, true, 0.0);
-//            CSC(cudaGetLastError());
-//            CSC(cudaMemcpy(buff, dev_plane_xz, sizeof(double) * _size_plane, cudaMemcpyDeviceToHost));
-            for (k = 0; k < nz; ++k)
-                for (i = 0; i < nx; i++)
-                    buff[k * nx + i] = data[_i(i, 0, k)];
+            kernel_copy_xz<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, 0, true, 0.0);
+            CSC(cudaGetLastError());
+            CSC(cudaMemcpy(buff, dev_buff, sizeof(double) * _size_plane, cudaMemcpyDeviceToHost));
+//            for (k = 0; k < nz; ++k)
+//                for (i = 0; i < nx; i++) {
+//                    if (buff[_ixz(i, k)] != data[_i(i, 0, k)]) {
+//                        std::cerr << buff[_ixz(i, k)] << " " << data[_i(i, 0, k)] << "\n";
+//                    }
+//                    buff[_ixz(i, k)] = data[_i(i, 0, k)];
+//                }
             MPI_Send(buff, nz * nx, MPI_DOUBLE, _ib(ib, jb - 1, kb), id, MPI_COMM_WORLD);
         }
 
         if (jb + 1 < nby) {
             MPI_Recv(buff, nx * nz, MPI_DOUBLE, _ib(ib, jb + 1, kb), _ib(ib, jb + 1, kb),
                      MPI_COMM_WORLD, &status);
-            for (k = 0; k < nz; k++)
-                for (i = 0; i < nx; i++)
-                    data[_i(i, ny, k)] = buff[k * nx + i];
+            CSC(cudaMemcpy(dev_buff, buff, sizeof(double) * _size_plane, cudaMemcpyHostToDevice));
+            kernel_copy_xz<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, ny, false, 0.0);
+//            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
+//            for (k = 0; k < nz; k++)
+//                for (i = 0; i < nx; i++) {
+//                    if (_data[_i(i, ny, k)] != buff[_ixz(i, k)]) {
+//                        std::cerr << _data[_i(i, ny, k)] << " " << buff[_ixz(i, k)] << "\n";
+//                    }
+//                    data[_i(i, ny, k)] = buff[_ixz(i, k)];
+//                }
         } else {
-            for (k = 0; k < nz; k++)
-                for (i = 0; i < nx; i++)
-                    data[_i(i, ny, k)] = bc_back;
+            kernel_copy_xz<<<blocks, threads>>> (NULL, dev_data, nx, ny, nz, ny, false, bc_back);
+//            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
+//            for (k = 0; k < nz; k++)
+//                for (i = 0; i < nx; i++) {
+//                    if (_data[_i(i, ny, k)] != bc_back) {
+//                        std::cerr << _data[_i(i, ny, k)] << " " << bc_back << "\n";
+//                    }
+//                    data[_i(i, ny, k)] = bc_back;
+//                }
         }
 
         if (kb > 0) {
-            for (j = 0; j < ny; ++j)
-                for (i = 0; i < nx; i++)
-                    buff[j * nx + i] = data[_i(i, j, 0)];
+            kernel_copy_xy<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, 0, true, 0.0);
+            CSC(cudaGetLastError());
+            CSC(cudaMemcpy(buff, dev_buff, sizeof(double) * _size_plane, cudaMemcpyDeviceToHost));
+//            for (j = 0; j < ny; ++j)
+//                for (i = 0; i < nx; i++) {
+//                    if(buff[_ixy(i, j)] != data[_i(i, j, 0)]) {
+//                        std::cerr << buff[_ixy(i, j)] << " " << data[_i(i, j, 0)] << "\n";
+//                    }
+//                    buff[_ixy(i, j)] = data[_i(i, j, 0)];
+//                }
             MPI_Send(buff, ny * nx, MPI_DOUBLE, _ib(ib, jb, kb - 1), id, MPI_COMM_WORLD);
         }
 
         if (kb + 1 < nbz) {
             MPI_Recv(buff, nx * ny, MPI_DOUBLE, _ib(ib, jb, kb + 1), _ib(ib, jb, kb + 1),
                      MPI_COMM_WORLD, &status);
-            for (j = 0; j < ny; ++j)
-                for (i = 0; i < nx; i++)
-                    data[_i(i, j, nz)] = buff[i + j * nx];
+            CSC(cudaMemcpy(dev_buff, buff, sizeof(double) * _size_plane, cudaMemcpyHostToDevice));
+            kernel_copy_xy<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, nz, false, 0.0);
+//            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
+//            for (j = 0; j < ny; ++j)
+//                for (i = 0; i < nx; i++) {
+//                    if(_data[_i(i, j, nz)] != buff[_ixy(i, j)]) {
+//                        std::cerr << _data[_i(i, j, nz)] << " " << buff[_ixy(i, j)] << "\n";
+//                    }
+//                    data[_i(i, j, nz)] = buff[_ixy(i, j)];
+//                }
         } else {
-            for (j = 0; j < ny; ++j)
-                for (i = 0; i < nx; ++i)
-                    data[_i(i, j, nz)] = bc_up;
+            kernel_copy_xy<<<blocks, threads>>> (NULL, dev_data, nx, ny, nz, nz, false, bc_up);
+//            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
+//            for (j = 0; j < ny; ++j)
+//                for (i = 0; i < nx; ++i) {
+//                    if(_data[_i(i, j, nz)] != bc_up) {
+//                        std::cerr << "bc_up: " << _data[_i(i, j, nz)] << " " << bc_up << "\n";
+//                    }
+//                    data[_i(i, j, nz)] = bc_up;
+//                }
         }
 
 
 //      Перевычисление значений температуры
+//        CSC(cudaMemcpy(dev_data, data, sizeof(double) * _size_b, cudaMemcpyHostToDevice));
+        kernel<<<dim3(8,8,8), dim3(32, 4, 4)>>>(dev_next, dev_data, nx, ny, nz, hx, hy, hz);
+        CSC(cudaGetLastError());
+        kernel_error<<<dim3(8,8,8), dim3(32, 4, 4)>>> (dev_next, dev_data, nx, ny, nz);
+        CSC(cudaGetLastError());
 
 
-        for (i = 0; i < nx; i++)
-            for (j = 0; j < ny; j++)
-                for (k = 0; k < nz; k++) {
-                    next[_i(i, j, k)] = 0.5 * ((data[_i(i + 1, j, k)] + data[_i(i - 1, j, k)]) / (hx * hx) +
-                                               (data[_i(i, j + 1, k)] + data[_i(i, j - 1, k)]) / (hy * hy) +
-                                               (data[_i(i, j, k + 1)] + data[_i(i, j, k - 1)]) / (hz * hz)) /
-                                        (1.0 / (hx * hx) + 1.0 / (hy * hy) + 1.0 / (hz * hz));
-                    diff = std::max(diff, fabs(next[_i(i, j, k)] - data[_i(i, j, k)]));
-                }
+        double g_error, error = 0.0;
+        thrust::device_ptr< double > p_arr = thrust::device_pointer_cast(dev_data);
+        thrust::device_ptr< double > res = thrust::max_element(p_arr, p_arr + _size_b);
+        error = *res;
+
+        temp = dev_data;
+        dev_data = dev_next;
+        dev_next = temp;
 
 
-        temp = next;
-        next = data;
-        data = temp;
+//        CSC(cudaMemcpy(data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
+//        for (i = 0; i < nx; i++)
+//            for (j = 0; j < ny; j++)
+//                for (k = 0; k < nz; k++) {
+//                    next[_i(i, j, k)] = 0.5 * ((data[_i(i + 1, j, k)] + data[_i(i - 1, j, k)]) / (hx * hx) +
+//                                               (data[_i(i, j + 1, k)] + data[_i(i, j - 1, k)]) / (hy * hy) +
+//                                               (data[_i(i, j, k + 1)] + data[_i(i, j, k - 1)]) / (hz * hz)) /
+//                                        (1.0 / (hx * hx) + 1.0 / (hy * hy) + 1.0 / (hz * hz));
+//                    diff = std::max(diff, fabs(next[_i(i, j, k)] - data[_i(i, j, k)]));
+//                }
+//
+//
+//        temp = next;
+//        next = data;
+//        data = temp;
 
 
         double *diffs = (double *) malloc(sizeof(double) * nbx * nby * nbz);
-        MPI_Allgather(&diff, 1, MPI_DOUBLE, diffs, 1, MPI_DOUBLE,
+        MPI_Allgather(&error, 1, MPI_DOUBLE, diffs, 1, MPI_DOUBLE,
                       MPI_COMM_WORLD);
         double gather_diff = 0;
         for (k = 0; k < nbx * nby * nbz; ++k) {
@@ -383,9 +488,23 @@ int main(int argc, char *argv[]) {
         if (gather_diff < eps) {
             break;
         }
-
+//        std::cerr << gather_diff << " ";
+//
+//        diffs = (double *) malloc(sizeof(double) * nbx * nby * nbz);
+//        MPI_Allgather(&diff, 1, MPI_DOUBLE, diffs, 1, MPI_DOUBLE,
+//                      MPI_COMM_WORLD);
+//        gather_diff = 0;
+//        for (k = 0; k < nbx * nby * nbz; ++k) {
+//            gather_diff = std::max(gather_diff, diffs[k]);
+//        }
+//        std::cerr << gather_diff << "\n";
 
     }
+    CSC(cudaMemcpy(data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
+    CSC(cudaFree(dev_data));
+    CSC(cudaFree(dev_next));
+    CSC(cudaFree(dev_buff));
+
     if (id != 0) {
         for (k = 0; k < nz; ++k)
             for (j = 0; j < ny; j++) {
@@ -414,8 +533,8 @@ int main(int argc, char *argv[]) {
                         }
         fclose(fd);
     }
-
     MPI_Finalize();
+    std::cerr <<"it: "<< it << "\n";
 
     free(buff);
     free(data);
