@@ -533,6 +533,7 @@ int main(int argc, char *argv[]) {
                         }
         fclose(fd);
     }
+
     MPI_Finalize();
     std::cerr <<"it: "<< it << "\n";
 
