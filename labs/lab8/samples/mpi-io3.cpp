@@ -21,12 +21,15 @@ int main(int argc, char *argv[]) {
 	for(j = 0; j < ny; j++) {
 		for(i = 0; i < nx; i++)
 			sprintf(buff + (j * nx + i) * n_size, "%d(%d) ", data[j * nx + i], rank);
-		if (rank + 1 == nprocs)
-			buff[(j + 1) * nx * n_size - 1] = '\n';
+//		if (rank + 1 == nprocs)
+//			buff[(j + 1) * nx * n_size - 1] = '\n';
 	}
-	for(i = 0; i < nx * ny * n_size; i++)
-		if (buff[i] == '\0')
-			buff[i] = ' ';
+	if(rank == 1)
+	for(i = 0; i < nx * ny * n_size; i++) {
+        if (buff[i] == '\0')
+            buff[i] = ' ';
+//        fprintf(stderr, "%c", buff[i]);
+    }
 
 
 	MPI_File fp;

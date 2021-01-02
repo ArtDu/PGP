@@ -142,9 +142,11 @@ int main(int argc, char *argv[]) {
     int i, j, k;
     int numproc, proc_name_len;
     char proc_name[MPI_MAX_PROCESSOR_NAME];
-    double lx, ly, lz, hx, hy, hz, bc_down, bc_up, bc_left, bc_right, bc_front, bc_back, eps, diff, u_0;
+    double lx, ly, lz, hx, hy, hz, bc_down, bc_up, bc_left, bc_right, bc_front, bc_back, eps, u_0;
     double *data, *temp, *next, *buff;
     double *dev_data, *dev_next, *dev_buff;
+
+//    double diff;
 
     std::string file_name;
 
@@ -214,12 +216,12 @@ int main(int argc, char *argv[]) {
     dim3 threads(32, 32);
 
     for (; true; it++) {
-        diff = 0;
+//        diff = 0;
 
 // Отправка данных и прием в перемешку
 
         if (ib + 1 < nbx) {
-            kernel_copy_yz<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, nx - 1, true, 0.0);
+            kernel_copy_yz<<<blocks, threads>>>(dev_buff, dev_data, nx, ny, nz, nx - 1, true, 0.0);
             CSC(cudaGetLastError());
             CSC(cudaMemcpy(buff, dev_buff, sizeof(double) * _size_plane, cudaMemcpyDeviceToHost));
 //            for (k = 0; k < nz; ++k)
@@ -234,7 +236,7 @@ int main(int argc, char *argv[]) {
             MPI_Recv(buff, ny * nz, MPI_DOUBLE, _ib(ib - 1, jb, kb), _ib(ib - 1, jb, kb),
                      MPI_COMM_WORLD, &status);
             CSC(cudaMemcpy(dev_buff, buff, sizeof(double) * _size_plane, cudaMemcpyHostToDevice));
-            kernel_copy_yz<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, -1, false, 0.0);
+            kernel_copy_yz<<<blocks, threads>>>(dev_buff, dev_data, nx, ny, nz, -1, false, 0.0);
 //            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
 //            for (k = 0; k < nz; ++k)
 //                for (j = 0; j < ny; j++) {
@@ -242,7 +244,7 @@ int main(int argc, char *argv[]) {
 //                    data[_i(-1, j, k)] = buff[_iyz(j, k)];
 //                }
         } else {
-            kernel_copy_yz<<<blocks, threads>>> (NULL, dev_data, nx, ny, nz, -1, false, bc_left);
+            kernel_copy_yz<<<blocks, threads>>>(NULL, dev_data, nx, ny, nz, -1, false, bc_left);
 //            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
 //            for (k = 0; k < nz; ++k)
 //                for (j = 0; j < ny; j++) {
@@ -253,7 +255,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (jb + 1 < nby) {
-            kernel_copy_xz<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, ny - 1, true, 0.0);
+            kernel_copy_xz<<<blocks, threads>>>(dev_buff, dev_data, nx, ny, nz, ny - 1, true, 0.0);
             CSC(cudaGetLastError());
             CSC(cudaMemcpy(buff, dev_buff, sizeof(double) * _size_plane, cudaMemcpyDeviceToHost));
 //            for (k = 0; k < nz; ++k)
@@ -268,7 +270,7 @@ int main(int argc, char *argv[]) {
             MPI_Recv(buff, nx * nz, MPI_DOUBLE, _ib(ib, jb - 1, kb), _ib(ib, jb - 1, kb),
                      MPI_COMM_WORLD, &status);
             CSC(cudaMemcpy(dev_buff, buff, sizeof(double) * _size_plane, cudaMemcpyHostToDevice));
-            kernel_copy_xz<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, -1, false, 0.0);
+            kernel_copy_xz<<<blocks, threads>>>(dev_buff, dev_data, nx, ny, nz, -1, false, 0.0);
 //            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
 //            for (k = 0; k < nz; ++k)
 //                for (i = 0; i < nx; i++) {
@@ -276,7 +278,7 @@ int main(int argc, char *argv[]) {
 //                    data[_i(i, -1, k)] = buff[_ixz(i, k)];
 //                }
         } else {
-            kernel_copy_xz<<<blocks, threads>>> (NULL, dev_data, nx, ny, nz, -1, false, bc_front);
+            kernel_copy_xz<<<blocks, threads>>>(NULL, dev_data, nx, ny, nz, -1, false, bc_front);
 //            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
 //            for (k = 0; k < nz; ++k)
 //                for (i = 0; i < nx; i++) {
@@ -287,7 +289,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (kb + 1 < nbz) {
-            kernel_copy_xy<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, nz - 1, true, 0.0);
+            kernel_copy_xy<<<blocks, threads>>>(dev_buff, dev_data, nx, ny, nz, nz - 1, true, 0.0);
             CSC(cudaGetLastError());
             CSC(cudaMemcpy(buff, dev_buff, sizeof(double) * _size_plane, cudaMemcpyDeviceToHost));
 //            for (j = 0; j < ny; ++j)
@@ -303,7 +305,7 @@ int main(int argc, char *argv[]) {
             MPI_Recv(buff, nx * ny, MPI_DOUBLE, _ib(ib, jb, kb - 1), _ib(ib, jb, kb - 1),
                      MPI_COMM_WORLD, &status);
             CSC(cudaMemcpy(dev_buff, buff, sizeof(double) * _size_plane, cudaMemcpyHostToDevice));
-            kernel_copy_xy<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, -1, false, 0.0);
+            kernel_copy_xy<<<blocks, threads>>>(dev_buff, dev_data, nx, ny, nz, -1, false, 0.0);
 //            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
 //            for (j = 0; j < ny; ++j)
 //                for (i = 0; i < nx; i++) {
@@ -313,7 +315,7 @@ int main(int argc, char *argv[]) {
 //                    data[_i(i, j, -1)] = buff[_ixy(i, j)];
 //                }
         } else {
-            kernel_copy_xy<<<blocks, threads>>> (NULL, dev_data, nx, ny, nz, -1, false, bc_down);
+            kernel_copy_xy<<<blocks, threads>>>(NULL, dev_data, nx, ny, nz, -1, false, bc_down);
 //            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
 //            for (j = 0; j < ny; ++j)
 //                for (i = 0; i < nx; ++i) {
@@ -325,7 +327,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (ib > 0) {
-            kernel_copy_yz<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, 0, true, 0.0);
+            kernel_copy_yz<<<blocks, threads>>>(dev_buff, dev_data, nx, ny, nz, 0, true, 0.0);
             CSC(cudaGetLastError());
             CSC(cudaMemcpy(buff, dev_buff, sizeof(double) * _size_plane, cudaMemcpyDeviceToHost));
 //            for (k = 0; k < nz; ++k)
@@ -341,7 +343,7 @@ int main(int argc, char *argv[]) {
             MPI_Recv(buff, ny * nz, MPI_DOUBLE, _ib(ib + 1, jb, kb), _ib(ib + 1, jb, kb),
                      MPI_COMM_WORLD, &status);
             CSC(cudaMemcpy(dev_buff, buff, sizeof(double) * _size_plane, cudaMemcpyHostToDevice));
-            kernel_copy_yz<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, nx, false, 0.0);
+            kernel_copy_yz<<<blocks, threads>>>(dev_buff, dev_data, nx, ny, nz, nx, false, 0.0);
 //            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
 //            for (k = 0; k < nz; ++k)
 //                for (j = 0; j < ny; j++) {
@@ -351,7 +353,7 @@ int main(int argc, char *argv[]) {
 //                    data[_i(nx, j, k)] = buff[_iyz(j, k)];
 //                }
         } else {
-            kernel_copy_yz<<<blocks, threads>>> (NULL, dev_data, nx, ny, nz, nx, false, bc_right);
+            kernel_copy_yz<<<blocks, threads>>>(NULL, dev_data, nx, ny, nz, nx, false, bc_right);
 //            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
 //            for (k = 0; k < nz; ++k)
 //                for (j = 0; j < ny; ++j) {
@@ -364,7 +366,7 @@ int main(int argc, char *argv[]) {
 
 
         if (jb > 0) {
-            kernel_copy_xz<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, 0, true, 0.0);
+            kernel_copy_xz<<<blocks, threads>>>(dev_buff, dev_data, nx, ny, nz, 0, true, 0.0);
             CSC(cudaGetLastError());
             CSC(cudaMemcpy(buff, dev_buff, sizeof(double) * _size_plane, cudaMemcpyDeviceToHost));
 //            for (k = 0; k < nz; ++k)
@@ -381,7 +383,7 @@ int main(int argc, char *argv[]) {
             MPI_Recv(buff, nx * nz, MPI_DOUBLE, _ib(ib, jb + 1, kb), _ib(ib, jb + 1, kb),
                      MPI_COMM_WORLD, &status);
             CSC(cudaMemcpy(dev_buff, buff, sizeof(double) * _size_plane, cudaMemcpyHostToDevice));
-            kernel_copy_xz<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, ny, false, 0.0);
+            kernel_copy_xz<<<blocks, threads>>>(dev_buff, dev_data, nx, ny, nz, ny, false, 0.0);
 //            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
 //            for (k = 0; k < nz; k++)
 //                for (i = 0; i < nx; i++) {
@@ -391,7 +393,7 @@ int main(int argc, char *argv[]) {
 //                    data[_i(i, ny, k)] = buff[_ixz(i, k)];
 //                }
         } else {
-            kernel_copy_xz<<<blocks, threads>>> (NULL, dev_data, nx, ny, nz, ny, false, bc_back);
+            kernel_copy_xz<<<blocks, threads>>>(NULL, dev_data, nx, ny, nz, ny, false, bc_back);
 //            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
 //            for (k = 0; k < nz; k++)
 //                for (i = 0; i < nx; i++) {
@@ -403,7 +405,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (kb > 0) {
-            kernel_copy_xy<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, 0, true, 0.0);
+            kernel_copy_xy<<<blocks, threads>>>(dev_buff, dev_data, nx, ny, nz, 0, true, 0.0);
             CSC(cudaGetLastError());
             CSC(cudaMemcpy(buff, dev_buff, sizeof(double) * _size_plane, cudaMemcpyDeviceToHost));
 //            for (j = 0; j < ny; ++j)
@@ -420,7 +422,7 @@ int main(int argc, char *argv[]) {
             MPI_Recv(buff, nx * ny, MPI_DOUBLE, _ib(ib, jb, kb + 1), _ib(ib, jb, kb + 1),
                      MPI_COMM_WORLD, &status);
             CSC(cudaMemcpy(dev_buff, buff, sizeof(double) * _size_plane, cudaMemcpyHostToDevice));
-            kernel_copy_xy<<<blocks, threads>>> (dev_buff, dev_data, nx, ny, nz, nz, false, 0.0);
+            kernel_copy_xy<<<blocks, threads>>>(dev_buff, dev_data, nx, ny, nz, nz, false, 0.0);
 //            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
 //            for (j = 0; j < ny; ++j)
 //                for (i = 0; i < nx; i++) {
@@ -430,7 +432,7 @@ int main(int argc, char *argv[]) {
 //                    data[_i(i, j, nz)] = buff[_ixy(i, j)];
 //                }
         } else {
-            kernel_copy_xy<<<blocks, threads>>> (NULL, dev_data, nx, ny, nz, nz, false, bc_up);
+            kernel_copy_xy<<<blocks, threads>>>(NULL, dev_data, nx, ny, nz, nz, false, bc_up);
 //            CSC(cudaMemcpy(_data, dev_data, sizeof(double) * _size_b, cudaMemcpyDeviceToHost));
 //            for (j = 0; j < ny; ++j)
 //                for (i = 0; i < nx; ++i) {
@@ -444,15 +446,15 @@ int main(int argc, char *argv[]) {
 
 //      Перевычисление значений температуры
 //        CSC(cudaMemcpy(dev_data, data, sizeof(double) * _size_b, cudaMemcpyHostToDevice));
-        kernel<<<dim3(8,8,8), dim3(32, 4, 4)>>>(dev_next, dev_data, nx, ny, nz, hx, hy, hz);
+        kernel<<<dim3(8, 8, 8), dim3(32, 4, 4)>>>(dev_next, dev_data, nx, ny, nz, hx, hy, hz);
         CSC(cudaGetLastError());
-        kernel_error<<<dim3(8,8,8), dim3(32, 4, 4)>>> (dev_next, dev_data, nx, ny, nz);
+        kernel_error<<<dim3(8, 8, 8), dim3(32, 4, 4)>>>(dev_next, dev_data, nx, ny, nz);
         CSC(cudaGetLastError());
 
 
-        double g_error, error = 0.0;
-        thrust::device_ptr< double > p_arr = thrust::device_pointer_cast(dev_data);
-        thrust::device_ptr< double > res = thrust::max_element(p_arr, p_arr + _size_b);
+        double error = 0.0;
+        thrust::device_ptr<double> p_arr = thrust::device_pointer_cast(dev_data);
+        thrust::device_ptr<double> res = thrust::max_element(p_arr, p_arr + _size_b);
         error = *res;
 
         temp = dev_data;
@@ -505,41 +507,88 @@ int main(int argc, char *argv[]) {
     CSC(cudaFree(dev_next));
     CSC(cudaFree(dev_buff));
 
-    if (id != 0) {
-        for (k = 0; k < nz; ++k)
-            for (j = 0; j < ny; j++) {
-                for (i = 0; i < nx; i++)
-                    buff[i] = data[_i(i, j, k)];
-                MPI_Send(buff, nx, MPI_DOUBLE, 0, id, MPI_COMM_WORLD);
-            }
-    } else {
-        FILE *fd;
-        fd = fopen(file_name.c_str(), "w");
-        for (kb = 0; kb < nbz; kb++)
-            for (k = 0; k < nz; ++k)
-                for (jb = 0; jb < nby; jb++)
-                    for (j = 0; j < ny; j++)
-                        for (ib = 0; ib < nbx; ib++) {
-                            if (_ib(ib, jb, kb) == 0)
-                                for (i = 0; i < nx; i++)
-                                    buff[i] = data[_i(i, j, k)];
-                            else
-                                MPI_Recv(buff, nx, MPI_DOUBLE, _ib(ib, jb, kb), _ib(ib, jb, kb), MPI_COMM_WORLD,
-                                         &status);
-                            for (i = 0; i < nx; i++) {
-//                                printf("%.2f ", buff[i]);
-                                fprintf(fd, "%.7e ", buff[i]);
-                            }
-                        }
-        fclose(fd);
+    int n_size = 14;
+    char *out_buff = (char *) malloc(sizeof(char) * nx * ny * nz * n_size);
+
+    memset(out_buff, ' ', nx * ny * nz * n_size * sizeof(char));
+    for (k = 0; k < nz; k++) {
+        for (j = 0; j < ny; j++)
+            for (i = 0; i < nx; i++)
+                sprintf(out_buff + ((k * nx * ny) + j * nx + i) * n_size, "%.7e", data[_i(i, j, k)]);
     }
+//    if (id == 1)
+    for (i = 0; i < nx * ny * nz * n_size; i++) {
+        if (out_buff[i] == '\0')
+            out_buff[i] = ' ';
+//            fprintf(stderr, "%c", out_buff[i]);
+    }
+//    fprintf(stderr, "\n");
+
+    MPI_Datatype cell;
+    MPI_Type_contiguous(n_size, MPI_CHAR, &cell);
+    MPI_Type_commit(&cell);
+
+    MPI_Datatype subarray;
+    int subarray_starts[3] = {0, 0, 0};
+    int subarray_subsizes[3] = {nx, ny, nz};
+    int subarray_bigsizes[3] = {nx, ny, nz};
+    MPI_Type_create_subarray(3, subarray_bigsizes, subarray_subsizes, subarray_starts, MPI_ORDER_FORTRAN, cell, &subarray); // memtype
+    MPI_Type_commit(&subarray);
+
+    MPI_Datatype bigarray;
+    int bigarray_starts[3] = {ib * nx, jb * ny, kb * nz};
+    int bigarray_subsizes[3] = {nx, ny, nz};
+    int bigarray_bigsizes[3] = {nx * nbx, ny * nby, nz * nbz};
+    MPI_Type_create_subarray(3, bigarray_bigsizes, bigarray_subsizes, bigarray_starts, MPI_ORDER_FORTRAN, cell, &bigarray); // memtype
+    MPI_Type_commit(&bigarray);
+
+
+    MPI_File fp;
+    MPI_File_delete(file_name.c_str(), MPI_INFO_NULL);
+    MPI_File_open(MPI_COMM_WORLD, file_name.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp);
+
+
+    MPI_File_set_view(fp, 0, MPI_CHAR, bigarray, "native", MPI_INFO_NULL);
+    MPI_File_write_all(fp, out_buff, 1, subarray, MPI_STATUS_IGNORE);
+    MPI_File_close(&fp);
+
+
+//    if (id != 0) {
+//        for (k = 0; k < nz; ++k)
+//            for (j = 0; j < ny; j++) {
+//                for (i = 0; i < nx; i++)
+//                    buff[i] = data[_i(i, j, k)];
+//                MPI_Send(buff, nx, MPI_DOUBLE, 0, id, MPI_COMM_WORLD);
+//            }
+//    } else {
+//        FILE *fd;
+//        fd = fopen(file_name.c_str(), "w");
+//        for (kb = 0; kb < nbz; kb++)
+//            for (k = 0; k < nz; ++k)
+//                for (jb = 0; jb < nby; jb++)
+//                    for (j = 0; j < ny; j++)
+//                        for (ib = 0; ib < nbx; ib++) {
+//                            if (_ib(ib, jb, kb) == 0)
+//                                for (i = 0; i < nx; i++)
+//                                    buff[i] = data[_i(i, j, k)];
+//                            else
+//                                MPI_Recv(buff, nx, MPI_DOUBLE, _ib(ib, jb, kb), _ib(ib, jb, kb), MPI_COMM_WORLD,
+//                                         &status);
+//                            for (i = 0; i < nx; i++) {
+////                                printf("%.2f ", buff[i]);
+//                                fprintf(fd, "%.7e ", buff[i]);
+//                            }
+//                        }
+//        fclose(fd);
+//    }
 
     MPI_Finalize();
-    std::cerr <<"it: "<< it << "\n";
+//    std::cerr << "it: " << it << "\n";
 
     free(buff);
     free(data);
     free(next);
+    free(out_buff);
 
 
     return 0;
