@@ -135,8 +135,8 @@ __global__ void kernel_error(double *next, double *data, int nx, int ny, int nz)
 
 int main(int argc, char *argv[]) {
     std::ios_base::sync_with_stdio(false);
-//    std::cin.tie(nullptr);
-//    std::cout.tie(nullptr);
+    std::cin.tie(NULL);
+    std::cout.tie(NULL);
 
     int id, ib, jb, kb, nbx, nby, nbz, nx, ny, nz, it = 0;
     int i, j, k;
@@ -146,9 +146,7 @@ int main(int argc, char *argv[]) {
     double *data, *temp, *next, *buff;
     double *dev_data, *dev_next, *dev_buff;
 
-//    double diff;
-
-    std::string file_name;
+    char file_name[1024];
 
     MPI_Status status;
     MPI_Init(&argc, &argv);
@@ -165,6 +163,14 @@ int main(int argc, char *argv[]) {
         std::cin >> lx >> ly >> lz;
         std::cin >> bc_down >> bc_up >> bc_left >> bc_right >> bc_front >> bc_back;
         std::cin >> u_0;
+
+        std::cerr << nbx << " " << nby << " " << nbz << std::endl;
+        std::cerr << nx << " " << ny << " " << nz << std::endl;
+        std::cerr << file_name << std::endl;
+        std::cerr << eps << std::endl;
+        std::cerr << lx << " " << ly << " " << lz << " " << std::endl;
+        std::cerr << bc_down << " " << bc_up << " " << bc_left << " " << bc_right << " " << bc_front << " " << bc_back << std::endl;
+        std::cerr << u_0 << std::endl;
     }
 
     MPI_Bcast(&nx, 1, MPI_INT, 0, MPI_COMM_WORLD);      // Передача параметров расчета всем процессам
@@ -184,6 +190,7 @@ int main(int argc, char *argv[]) {
     MPI_Bcast(&bc_back, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     MPI_Bcast(&eps, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     MPI_Bcast(&u_0, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(file_name, 1024, MPI_CHAR, 0, MPI_COMM_WORLD);
 
     ib = _ibx(id);    // Переход к 3-мерной индексации процессов
     jb = _iby(id);
@@ -196,7 +203,7 @@ int main(int argc, char *argv[]) {
     int _size_b = (nx + 2) * (ny + 2) * (nz + 2);
     int _size_plane = (std::max(nx, std::max(ny, nz)) * std::max(nx, std::max(ny, nz)) + 2);
     data = (double *) malloc(sizeof(double) * _size_b);
-    double *_data = (double *) malloc(sizeof(double) * _size_b);
+//    double *_data = (double *) malloc(sizeof(double) * _size_b);
     next = (double *) malloc(sizeof(double) * _size_b);
     buff = (double *) malloc(sizeof(double) * _size_plane);
 
@@ -514,7 +521,7 @@ int main(int argc, char *argv[]) {
     for (k = 0; k < nz; k++) {
         for (j = 0; j < ny; j++)
             for (i = 0; i < nx; i++)
-                sprintf(out_buff + ((k * nx * ny) + j * nx + i) * n_size, "%.7e", data[_i(i, j, k)]);
+                sprintf(out_buff + ((k * nx * ny) + j * nx + i) * n_size, "%.6e", data[_i(i, j, k)]);
     }
 //    if (id == 1)
     for (i = 0; i < nx * ny * nz * n_size; i++) {
@@ -542,10 +549,9 @@ int main(int argc, char *argv[]) {
     MPI_Type_create_subarray(3, bigarray_bigsizes, bigarray_subsizes, bigarray_starts, MPI_ORDER_FORTRAN, cell, &bigarray); // memtype
     MPI_Type_commit(&bigarray);
 
-
     MPI_File fp;
-    MPI_File_delete(file_name.c_str(), MPI_INFO_NULL);
-    MPI_File_open(MPI_COMM_WORLD, file_name.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp);
+    MPI_File_delete(file_name, MPI_INFO_NULL);
+    MPI_File_open(MPI_COMM_WORLD, file_name, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp);
 
 
     MPI_File_set_view(fp, 0, MPI_CHAR, bigarray, "native", MPI_INFO_NULL);
