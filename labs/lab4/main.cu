@@ -16,10 +16,8 @@ do {                                \
   }                               \
 } while(0)
 
-struct comparator
-{
-    __host__ __device__ bool operator()(double a, double b)
-    {
+struct comparator {
+    __host__ __device__ bool operator()(double a, double b) {
         return fabs(a) < fabs(b);
     }
 };
@@ -44,18 +42,20 @@ __global__ void kernel_change_lines(double *A, int row, int col, int n, int m) {
     int offsetx = blockDim.x * gridDim.x;                               // Общее кол-во потоков
     int offsety = blockDim.y * gridDim.y;                               // Общее кол-во потоков
 
-    for (int k = row + idy + 1; k < n; k += offsety) {
-            for (int p = col + idx + 1; p < m; p += offsetx) {
-                A[p * n + k] -= ((A[p * n + row] / A[col * n + row]) * A[col * n + k]);
+
+    for (int p = col + idx + 1; p < m; p += offsetx) {
+        for (int k = row + idy + 1; k < n; k += offsety) {
+            A[p * n + k] -= ((A[p * n + row] / A[col * n + row]) * A[col * n + k]);
 //                A[p * n + k] = A[col * n + k];
-            }
+        }
     }
 }
 
 
-
-const int BLOCKS = 1024;
-const int THREADS = 1024;
+const int BLOCKS = 64;
+const int THREADS = 64;
+dim3 _BLOCKS(6, 64);
+dim3 _THREADS(2, 64);
 const double EPS = 1e-7;
 
 
@@ -66,27 +66,24 @@ int main(int argc, char *argv[]) {
 
     int n, m;
     scanf("%d%d", &n, &m);
-    double *h_A = (double *)malloc(sizeof(double) * n * m);
+    double *h_A = (double *) malloc(sizeof(double) * n * m);
 
-
-//    cerr << n << " " << m << "\n";
+//    fprintf(stderr, "%d %d\n", n, m);
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < m; ++j) {
             scanf("%lf", &h_A[j * n + i]);
-//                cerr << h_A[j * n + i] << " ";
+//            if(i == j) {
+//                fprintf(stderr, "%lf\n", h_A[j * n + i]);
+//            }
         }
-//            cerr << "\n";
     }
-
+//    fprintf(stderr, "\n");
 
 //    cudaEvent_t start, stop;
 //    float gpu_time = 0.0;
 //    cudaEventCreate(&start);
 //    cudaEventCreate(&stop);
 //    cudaEventRecord(start, 0);
-
-
-
 /////////////////////////////////////////////////////
 
 
@@ -102,12 +99,15 @@ int main(int argc, char *argv[]) {
     device_ptr<double> data_ptr, mx_ptr;
     for (int j = 0, i = 0; j < m && i < n; ++j, ++i) {
 
+
         mx = EPS;
         data_ptr = device_pointer_cast(d_A + j * n); // get column begin
         mx_ptr = thrust::max_element(data_ptr + i, data_ptr + n, comp); // get max in column
 
         mx = fabs(*mx_ptr);
         mx_idx = mx_ptr - data_ptr; // get max idx
+
+
 
 //        cerr << "(" << j << "," << i << "," << mx_idx << "); mx: " << mx << "\n\n";
 
@@ -119,10 +119,8 @@ int main(int argc, char *argv[]) {
                 CSC(cudaGetLastError());
             }
 
-
-            kernel_change_lines<<<dim3(16, 64), dim3(16, 64)>>>(d_A, i, j, n, m);
+            kernel_change_lines<<<_BLOCKS, _THREADS>>>(d_A, i, j, n, m);
             CSC(cudaGetLastError());
-
 
         } else {
             --i;
@@ -134,19 +132,16 @@ int main(int argc, char *argv[]) {
 
 
 
-    printf("%d", rank);
+    printf("%d\n", rank);
 //    cerr << rank << "\n";
 
 //    cudaEventRecord(stop, 0);
 //    cudaEventSynchronize(stop);
 //    cudaEventElapsedTime(&gpu_time, start, stop);
-//
 //    cerr << "time:\n";
 //    cerr << "blocks = " << BLOCKS << "; threads = " << THREADS << "\n";
-//    cerr << "2d = 32x32 32x32\n";
+//    cerr << "2d = "<< _BLOCKS.x << "x" << _BLOCKS.y << " " << _THREADS.x << "x" << _THREADS.y << "\n";
 //    cerr << gpu_time << endl;
-
-
 
 
     return 0;
