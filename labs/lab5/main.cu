@@ -20,13 +20,13 @@ do {                                \
 
 #define BUCKET_SIZE 1024
 
-__global__ void bitonic_sort_step(int *dev_values, int j, int k, int swap) {
+__global__ void bitonic_sort_step(int *dev_values, int k) {
     __shared__ int shared[BUCKET_SIZE];
 
-    unsigned int i, ixj; /* Sorting partners: i and ixj */
+    unsigned int i, j, ixj, temp; /* Sorting partners: i and ixj */
     i = threadIdx.x;
 
-    if(swap && i >= k / 2){
+    if(i >= k / 2){
         int diff = i - k / 2;
         shared[i] = dev_values[k - 1 - diff];
     } else {
@@ -35,77 +35,38 @@ __global__ void bitonic_sort_step(int *dev_values, int j, int k, int swap) {
 
     __syncthreads();
 
-    ixj = i ^ j;
-
-    /* The threads with the lowest ids sort the array. */
-    if ((ixj) > i) {
-        if ((i & k) == 0) {
-            /* Sort ascending */
-            if (shared[i] > shared[ixj]) {
-                /* exchange(i,ixj); */
-                int temp = shared[i];
-                shared[i] = shared[ixj];
-                shared[ixj] = temp;
+    for (j = k >> 1; j > 0; j = j >> 1) {
+        ixj = i ^ j;
+        /* The threads with the lowest ids sort the array. */
+        if ((ixj) > i) {
+            if ((i & k) == 0) {
+                /* Sort ascending */
+                if (shared[i] > shared[ixj]) {
+                    /* exchange(i,ixj); */
+                    temp = shared[i];
+                    shared[i] = shared[ixj];
+                    shared[ixj] = temp;
+                }
+            }
+            if ((i & k) != 0) {
+                /* Sort descending */
+                if (shared[i] < shared[ixj]) {
+                    /* exchange(i,ixj); */
+                    temp = shared[i];
+                    shared[i] = shared[ixj];
+                    shared[ixj] = temp;
+                }
             }
         }
-        if ((i & k) != 0) {
-            /* Sort descending */
-            if (shared[i] < shared[ixj]) {
-                /* exchange(i,ixj); */
-                int temp = shared[i];
-                shared[i] = shared[ixj];
-                shared[ixj] = temp;
-            }
-        }
+        __syncthreads();
     }
-    __syncthreads();
     dev_values[i] = shared[i];
 }
 
-__global__ void swap_half(int *dev_values, int sz) {
-    for (int i = sz / 2, j = sz - 1; i < j; i++, j-- ){
-        thrust::swap(dev_values[i], dev_values[j]);
-    }
-}
 
-__global__ void swap_half_shared(int *dev_values, int sz) {
-    __shared__ int shared[BUCKET_SIZE];
-
-    unsigned int id;
-    id = threadIdx.x;
-
-
-    if(id >= sz / 2){
-        int diff = id - sz / 2;
-        shared[id] = dev_values[sz - 1 - diff];
-    } else {
-        shared[id] = dev_values[id];
-    }
-
-    __syncthreads();
-    dev_values[id] = shared[id];
-}
-
-__global__ void test(int *dev_values, int sz) {
-    dev_values[0] = sz;
-}
 
 void bitonic_merge(int *dev_values, int sz) {
-
-//    test<<<1, 1>>>(dev_values, sz);
-//    swap_half<<<1, 1>>>(dev_values, sz);
-//    swap_half_shared<<<1, BUCKET_SIZE>>>(dev_values, sz);
-
-    int j, k;
-    /* Major step */
-    k = sz;
-    /* Minor step */
-    j = k >> 1;
-    bitonic_sort_step<<<1, sz>>>(dev_values, j, k, 1);
-    for (; j > 0; j = j >> 1) {
-        bitonic_sort_step<<<1, sz>>>(dev_values, j, k, 0);
-    }
-
+    bitonic_sort_step<<<1, sz>>>(dev_values, sz);
 }
 
 void bitonic(int *dev_values, int sz, int odd) {
@@ -120,38 +81,41 @@ void bitonic(int *dev_values, int sz, int odd) {
     }
 }
 
-__global__ void oddeven_sort_step(int *values, int odd, int n) {
+__global__ void oddeven_sort_step(int *values, int n) {
     __shared__ int shared[BUCKET_SIZE];
 
     int id = threadIdx.x;
-
+    int odd, i;
     shared[id] = values[id];
     __syncthreads();
 
-    if (odd == 0 && id % 2 == 0 && id + 1 < n) {
-        if (shared[id] > shared[id + 1]) {
-            int tmp = shared[id];
-            shared[id] = shared[id + 1];
-            shared[id + 1] = tmp;
+    for (i = 0; i < n; i++) {
+        odd = i % 2;
+        if (odd == 0 && id % 2 == 0 && id + 1 < n) {
+            if (shared[id] > shared[id + 1]) {
+                int tmp = shared[id];
+                shared[id] = shared[id + 1];
+                shared[id + 1] = tmp;
+            }
         }
-    }
-    if (odd == 1 && id % 2 == 1 && id + 1 < n) {
-        if (shared[id] > shared[id + 1]) {
-            int tmp = shared[id];
-            shared[id] = shared[id + 1];
-            shared[id + 1] = tmp;
+        if (odd == 1 && id % 2 == 1 && id + 1 < n) {
+            if (shared[id] > shared[id + 1]) {
+                int tmp = shared[id];
+                shared[id] = shared[id + 1];
+                shared[id + 1] = tmp;
+            }
         }
-    }
 
-    __syncthreads();
+        __syncthreads();
+    }
     values[id] = shared[id];
+
 }
 
 void oddeven_sort(int *dev_values, int sz) {
-    for (int i = 0; i < sz; i++) {
-        oddeven_sort_step<<<1, sz>>>(dev_values, i % 2, sz);
-    }
+    oddeven_sort_step<<<1, sz>>>(dev_values, sz);
 }
+
 
 void parallel_sort(int *values, int sz) {
     int *dev_values;
@@ -166,13 +130,13 @@ void parallel_sort(int *values, int sz) {
     }
 
 
-    for (int i = 0; i < 2 * (sz / BUCKET_SIZE) ; ++i){
+    for (int i = 0; i < 2 * (sz / BUCKET_SIZE); ++i){
         bitonic(dev_values, sz, i % 2);
     }
 //    bitonic(dev_values, sz, 0);
 
     CSC(cudaMemcpy(values, dev_values, size, cudaMemcpyDeviceToHost));
-    CSC(cudaFree(dev_values));
+//    CSC(cudaFree(dev_values));
 }
 
 int main(int argc, char *argv[]) {
@@ -214,7 +178,7 @@ int main(int argc, char *argv[]) {
 //        fprintf(stderr, "%d ", values[i]);
 //    }
 //    fprintf(stderr, "\n");
-    free(values);
+//    free(values);
     return 0;
 }
 
