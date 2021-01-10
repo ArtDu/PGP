@@ -18,122 +18,162 @@ do {                                \
   }                               \
 } while(0)
 
+#define BLOCKS 10
 #define BUCKET_SIZE 1024
 
-__global__ void bitonic_sort_step(int *dev_values, int k) {
+__global__ void bitonic_sort_step(int *values, int sz, int odd) {
     __shared__ int shared[BUCKET_SIZE];
 
+    int *dev_values, k = BUCKET_SIZE;
     unsigned int i, j, ixj, temp; /* Sorting partners: i and ixj */
+    int block_id = blockIdx.x;
+    int block_offset = gridDim.x;
     i = threadIdx.x;
 
-    if(i >= k / 2){
-        int diff = i - k / 2;
-        shared[i] = dev_values[k - 1 - diff];
-    } else {
-        shared[i] = dev_values[i];
-    }
+    if(odd)
+        for (int step = (BUCKET_SIZE / 2) + block_id * BUCKET_SIZE; step + BUCKET_SIZE < sz; step = step + block_offset * BUCKET_SIZE) {
+            dev_values = values + step;
 
-    __syncthreads();
-
-    for (j = k >> 1; j > 0; j = j >> 1) {
-        ixj = i ^ j;
-        /* The threads with the lowest ids sort the array. */
-        if ((ixj) > i) {
-            if ((i & k) == 0) {
-                /* Sort ascending */
-                if (shared[i] > shared[ixj]) {
-                    /* exchange(i,ixj); */
-                    temp = shared[i];
-                    shared[i] = shared[ixj];
-                    shared[ixj] = temp;
-                }
+            if (i >= k / 2) {
+                int diff = i - k / 2;
+                shared[i] = dev_values[k - 1 - diff];
+            } else {
+                shared[i] = dev_values[i];
             }
-            if ((i & k) != 0) {
-                /* Sort descending */
-                if (shared[i] < shared[ixj]) {
-                    /* exchange(i,ixj); */
-                    temp = shared[i];
-                    shared[i] = shared[ixj];
-                    shared[ixj] = temp;
+
+            __syncthreads();
+
+            for (j = k >> 1; j > 0; j = j >> 1) {
+                ixj = i ^ j;
+                /* The threads with the lowest ids sort the array. */
+                if ((ixj) > i) {
+                    if ((i & k) == 0) {
+                        /* Sort ascending */
+                        if (shared[i] > shared[ixj]) {
+                            /* exchange(i,ixj); */
+                            temp = shared[i];
+                            shared[i] = shared[ixj];
+                            shared[ixj] = temp;
+                        }
+                    }
+                    if ((i & k) != 0) {
+                        /* Sort descending */
+                        if (shared[i] < shared[ixj]) {
+                            /* exchange(i,ixj); */
+                            temp = shared[i];
+                            shared[i] = shared[ixj];
+                            shared[ixj] = temp;
+                        }
+                    }
                 }
+                __syncthreads();
             }
+            dev_values[i] = shared[i];
         }
-        __syncthreads();
+    else
+        for (int step = block_id * BUCKET_SIZE; step < sz; step = step + block_offset * BUCKET_SIZE) {
+            dev_values = values + step;
+
+            if (i >= k / 2) {
+                int diff = i - k / 2;
+                shared[i] = dev_values[k - 1 - diff];
+            } else {
+                shared[i] = dev_values[i];
+            }
+
+            __syncthreads();
+
+            for (j = k >> 1; j > 0; j = j >> 1) {
+                ixj = i ^ j;
+                /* The threads with the lowest ids sort the array. */
+                if ((ixj) > i) {
+                    if ((i & k) == 0) {
+                        /* Sort ascending */
+                        if (shared[i] > shared[ixj]) {
+                            /* exchange(i,ixj); */
+                            temp = shared[i];
+                            shared[i] = shared[ixj];
+                            shared[ixj] = temp;
+                        }
+                    }
+                    if ((i & k) != 0) {
+                        /* Sort descending */
+                        if (shared[i] < shared[ixj]) {
+                            /* exchange(i,ixj); */
+                            temp = shared[i];
+                            shared[i] = shared[ixj];
+                            shared[ixj] = temp;
+                        }
+                    }
+                }
+                __syncthreads();
+            }
+            dev_values[i] = shared[i];
+        }
+
+}
+
+void bitonic_sort(int *values, int sz) {
+    for (int _i = 0; _i < 2 * (sz / BUCKET_SIZE); ++_i) {
+        bitonic_sort_step<<<BLOCKS, BUCKET_SIZE>>>(values, sz, _i % 2);
     }
-    dev_values[i] = shared[i];
 }
 
 
-
-void bitonic_merge(int *dev_values, int sz) {
-    bitonic_sort_step<<<1, sz>>>(dev_values, sz);
-}
-
-void bitonic(int *dev_values, int sz, int odd) {
-    if(odd == 0) {
-        for (int i = BUCKET_SIZE / 2; i + BUCKET_SIZE < sz; i += BUCKET_SIZE) {
-            bitonic_merge(dev_values + i, BUCKET_SIZE);
-        }
-    } else {
-        for (int i = 0; i < sz; i += BUCKET_SIZE) {
-            bitonic_merge(dev_values + i, BUCKET_SIZE);
-        }
-    }
-}
-
-__global__ void oddeven_sort_step(int *values, int n) {
+__global__ void oddeven_sort(int *dev_values, int sz) {
     __shared__ int shared[BUCKET_SIZE];
 
     int id = threadIdx.x;
-    int odd, i;
-    shared[id] = values[id];
-    __syncthreads();
+    int block_id = blockIdx.x;
+    int block_offset = gridDim.x;
+    int odd, i, n = BUCKET_SIZE;
+    int *values;
 
-    for (i = 0; i < n; i++) {
-        odd = i % 2;
-        if (odd == 0 && id % 2 == 0 && id + 1 < n) {
-            if (shared[id] > shared[id + 1]) {
-                int tmp = shared[id];
-                shared[id] = shared[id + 1];
-                shared[id + 1] = tmp;
-            }
-        }
-        if (odd == 1 && id % 2 == 1 && id + 1 < n) {
-            if (shared[id] > shared[id + 1]) {
-                int tmp = shared[id];
-                shared[id] = shared[id + 1];
-                shared[id + 1] = tmp;
-            }
-        }
-
+    for (int j = block_id * BUCKET_SIZE; j < sz; j = j + block_offset * BUCKET_SIZE) {
+        values = dev_values + j;
+        shared[id] = values[id];
         __syncthreads();
+
+        for (i = 0; i < n; i++) {
+            odd = i % 2;
+            if (odd == 0 && id % 2 == 0 && id + 1 < n) {
+                if (shared[id] > shared[id + 1]) {
+                    int tmp = shared[id];
+                    shared[id] = shared[id + 1];
+                    shared[id + 1] = tmp;
+                }
+            }
+            if (odd == 1 && id % 2 == 1 && id + 1 < n) {
+                if (shared[id] > shared[id + 1]) {
+                    int tmp = shared[id];
+                    shared[id] = shared[id + 1];
+                    shared[id + 1] = tmp;
+                }
+            }
+
+            __syncthreads();
+        }
+        values[id] = shared[id];
     }
-    values[id] = shared[id];
+
 
 }
 
-void oddeven_sort(int *dev_values, int sz) {
-    oddeven_sort_step<<<1, sz>>>(dev_values, sz);
-}
 
-
-void parallel_sort(int *values, int sz) {
+void parallel_sort(int *values, int new_sz) {
     int *dev_values;
-    size_t size = sz * sizeof(int);
+    size_t size = new_sz * sizeof(int);
 
     CSC(cudaMalloc(&dev_values, size));
     CSC(cudaMemcpy(dev_values, values, size, cudaMemcpyHostToDevice));
 
     // sort all buckets by odd-even sort
-    for (int i = 0; i < sz; i += BUCKET_SIZE) {
-        oddeven_sort(dev_values + i, BUCKET_SIZE);
-    }
+    oddeven_sort<<<BLOCKS, BUCKET_SIZE>>>(dev_values, new_sz);
 
+    // sort buckets between themselves by odd-even merge sort
+//    bitonic_sort<<<BLOCKS, BUCKET_SIZE>>>(dev_values, new_sz);
+    bitonic_sort(dev_values, new_sz);
 
-    for (int i = 0; i < 2 * (sz / BUCKET_SIZE); ++i){
-        bitonic(dev_values, sz, i % 2);
-    }
-//    bitonic(dev_values, sz, 0);
 
     CSC(cudaMemcpy(values, dev_values, size, cudaMemcpyDeviceToHost));
 //    CSC(cudaFree(dev_values));
