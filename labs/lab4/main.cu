@@ -46,7 +46,6 @@ __global__ void kernel_change_lines(double *A, int row, int col, int n, int m) {
     for (int p = col + idx + 1; p < m; p += offsetx) {
         for (int k = row + idy + 1; k < n; k += offsety) {
             A[p * n + k] -= ((A[p * n + row] / A[col * n + row]) * A[col * n + k]);
-//                A[p * n + k] = A[col * n + k];
         }
     }
 }
@@ -68,16 +67,11 @@ int main(int argc, char *argv[]) {
     scanf("%d%d", &n, &m);
     double *h_A = (double *) malloc(sizeof(double) * n * m);
 
-//    fprintf(stderr, "%d %d\n", n, m);
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < m; ++j) {
             scanf("%lf", &h_A[j * n + i]);
-//            if(i == j) {
-//                fprintf(stderr, "%lf\n", h_A[j * n + i]);
-//            }
         }
     }
-//    fprintf(stderr, "\n");
 
 //    cudaEvent_t start, stop;
 //    float gpu_time = 0.0;
@@ -109,7 +103,6 @@ int main(int argc, char *argv[]) {
 
 
 
-//        cerr << "(" << j << "," << i << "," << mx_idx << "); mx: " << mx << "\n\n";
 
         if (mx > EPS) {
             ++rank;
@@ -127,13 +120,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-//    CSC(cudaFree(d_A));
-//    free(h_A);
 
 
 
     printf("%d\n", rank);
-//    cerr << rank << "\n";
 
 //    cudaEventRecord(stop, 0);
 //    cudaEventSynchronize(stop);

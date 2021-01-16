@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (ib > 0) {
-            MPI_Recv(buff, ny * nz, MPI_DOUBLE, _ib(ib - 1, jb, kb), _ib(ib - 1, jb, kb),
+                MPI_Recv(buff, ny * nz, MPI_DOUBLE, _ib(ib - 1, jb, kb), _ib(ib - 1, jb, kb),
                      MPI_COMM_WORLD, &status);
             #pragma omp parallel for private(i, j, k) shared(data, buff)
             for (k = 0; k < nz; ++k)

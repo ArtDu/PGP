@@ -18,7 +18,7 @@ do {                                \
   }                               \
 } while(0)
 
-#define BLOCKS 10
+#define BLOCKS 1
 #define BUCKET_SIZE 1024
 
 __global__ void bitonic_sort_step(int *values, int sz, int odd) {
@@ -189,7 +189,7 @@ int main(int argc, char *argv[]) {
     int sz;
 //    scanf("%d", &sz);
     fread(&sz, sizeof(int), 1, stdin);
-    fprintf(stderr, "%d\n", sz);
+//    fprintf(stderr, "%d\n", sz);
 
     int new_sz = ceil((double)sz / BUCKET_SIZE) * BUCKET_SIZE;
 //    fprintf(stderr, "%d\n", new_sz);
@@ -207,10 +207,20 @@ int main(int argc, char *argv[]) {
 //    for(; i < new_sz; ++i)
 //        values[i] = INT_MAX;
 
-
+    cudaEvent_t start, stop;
+    float gpu_time = 0.0;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start, 0);
 
     parallel_sort(values, new_sz);
 
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&gpu_time, start, stop);
+    cerr << "time:\n";
+    cerr << "blocks = " << BLOCKS << "; threads = " << BUCKET_SIZE << "\n";
+    cerr << gpu_time << endl;
 
     fwrite(values, sizeof(int), sz, stdout);
 //    for (int i = 0; i < sz; i++) {

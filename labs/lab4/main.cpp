@@ -5,24 +5,6 @@
 
 using namespace std;
 
-//#define CSC(call)                           \
-//do {                                \
-//  cudaError_t res = call;                     \
-//  if (res != cudaSuccess) {                   \
-//    fprintf(stderr, "ERROR in %s:%d. Message: %s\n",      \
-//        __FILE__, __LINE__, cudaGetErrorString(res));   \
-//    exit(0);                          \
-//  }                               \
-//} while(0)
-
-
-//__global__ void kernel(double *data) {
-//    int idy = blockIdx.y * blockDim.y + threadIdx.y;
-//    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-//    int offsety = blockDim.y * gridDim.y;
-//    int offsetx = blockDim.x * gridDim.x;
-//
-//}
 
 const double EPS = 1E-9;
 
@@ -38,18 +20,38 @@ int compute_rank(vector <vector<double>> A) {
             if (!row_selected[j] && abs(A[j][i]) > EPS)
                 break;
         }
-
+        if(j != n)
+            cerr << "col: " << i << " row: " << j << " mx: " <<  abs(A[j][i]) << "\n\n";
         if (j != n) {
             ++rank;
             row_selected[j] = true;
             for (int p = i + 1; p < m; ++p)
                 A[j][p] /= A[j][i];
+
+            cerr << "change curr line\n";
+            for (int k = 0; k < n; ++k) {
+                for (int l = 0; l < m; ++l) {
+                    cerr << A[k][l] << " ";
+                }
+                cerr << "\n";
+            }
+            cerr << "\n";
+
+
             for (int k = 0; k < n; ++k) {
                 if (k != j && abs(A[k][i]) > EPS) {
                     for (int p = i + 1; p < m; ++p)
                         A[k][p] -= A[j][p] * A[k][i];
                 }
             }
+            cerr << "change other lines\n";
+            for (int k = 0; k < n; ++k) {
+                for (int l = 0; l < m; ++l) {
+                    cerr << A[k][l] << " ";
+                }
+                cerr << "\n";
+            }
+            cerr << "\n";
         }
     }
     return rank;
@@ -67,7 +69,9 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < m; ++j) {
             cin >> A[i][j];
+            cerr << A[i][j] << " ";
         }
+        cerr << "\n";
     }
     cout << compute_rank(A) << "\n";
 

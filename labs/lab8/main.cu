@@ -459,10 +459,10 @@ int main(int argc, char *argv[]) {
         CSC(cudaGetLastError());
 
 
-        double error = 0.0;
-        thrust::device_ptr<double> p_arr = thrust::device_pointer_cast(dev_data);
-        thrust::device_ptr<double> res = thrust::max_element(p_arr, p_arr + _size_b);
-        error = *res;
+            double error = 0.0;
+            thrust::device_ptr<double> p_arr = thrust::device_pointer_cast(dev_data);
+            thrust::device_ptr<double> res = thrust::max_element(p_arr, p_arr + _size_b);
+            error = *res;
 
         temp = dev_data;
         dev_data = dev_next;
