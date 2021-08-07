@@ -1,0 +1,3 @@
+<     for (int iter = id; iter < frames; iter += numproc) {
+---
+>     for (int iter = 0; iter < frames; ++iter) {

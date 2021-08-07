@@ -305,6 +305,8 @@ render_cpu(vec3 pc, vec3 pv, int w, int h, double angle, uchar4 *data, vec3 ligh
     vec3 bz = norm(diff(pv, pc));
     vec3 bx = norm(prod(bz, vec3(0.0, 0.0, 1.0)));
     vec3 by = norm(prod(bx, bz));
+
+    #pragma omp parallel for
     for (j = 0; j < h; j++) {
         for (i = 0; i < w; i++) {
             vec3 v;
@@ -350,6 +352,7 @@ void ssaa_cpu(uchar4 *src, uchar4 *out, int w, int h, int wScale, int hScale) {
     uint4 s;
 
 
+//    #pragma omp parallel for
     for(y = 0; y < h; y += 1) {
         for(x = 0; x < w; x += 1) {
             s = make_uint4(0,0,0,0);
@@ -518,10 +521,68 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-//    int numproc, id, device_count;
-//    MPI_Init(&argc, &argv);
-//    MPI_Comm_size(MPI_COMM_WORLD, &numproc);
-//    MPI_Comm_rank(MPI_COMM_WORLD, &id);
+    int numproc, id;
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &numproc);
+    MPI_Comm_rank(MPI_COMM_WORLD, &id);
+
+    MPI_Bcast(&frames, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(out, 256, MPI_CHAR, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&width, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&height, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&fov, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    MPI_Bcast(&r_center_0, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&z_center_0, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&f_center_0, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    MPI_Bcast(&A_center_r, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&A_center_z, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    MPI_Bcast(&w_center_r, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&w_center_z, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&w_center_f, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    MPI_Bcast(&p_center_r, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&p_center_z, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    MPI_Bcast(&r_direction_0, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&z_direction_0, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&f_direction_0, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    MPI_Bcast(&A_direction_r, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&A_direction_z, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    MPI_Bcast(&w_direction_r, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&w_direction_z, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&w_direction_f, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    MPI_Bcast(&p_direction_r, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&p_direction_z, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    MPI_Bcast((double *)&hexahedron_center, 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast((double *)&hexahedron_color, 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&hexahedron_radius, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    MPI_Bcast((double *)&octahedron_center, 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast((double *)&octahedron_color, 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&octahedron_radius, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    MPI_Bcast((double *)&dodecahedron_center, 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast((double *)&dodecahedron_color, 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&dodecahedron_radius, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    MPI_Bcast((double *)scene_points, 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast((double *)scene_points + 1, 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast((double *)scene_points + 2, 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast((double *)scene_points + 3, 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast((double *)&scene_color, 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    MPI_Bcast(&light, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast((double *)&light_src, light * 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast((double *)&light_color, light * 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&multiplier, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
 
     int polygons_sz = 58;
     polygon polygons[polygons_sz],
@@ -553,7 +614,7 @@ int main(int argc, char *argv[]) {
     char buff[256];
 
 
-    for (int iter = 0; iter < frames; ++iter) {
+    for (int iter = id; iter < frames; iter += numproc) {
         double step = 2 * M_PI * iter / frames;
 
         double r_center = A_center_r * sin(w_center_r * step + p_center_r) + r_center_0;
@@ -603,7 +664,7 @@ int main(int argc, char *argv[]) {
 
         sprintf(buff, out, iter);
 
-        cerr << iter << "\t" << gpu_time << "\t"  << width * height * multiplier * multiplier << endl;
+        cerr << id << ": " << iter << "\t" << gpu_time << "\t"  << width * height * multiplier * multiplier << endl;
         FILE *out = fopen(buff, "w");
         fwrite(&width, sizeof(int), 1, out);
         fwrite(&height, sizeof(int), 1, out);
@@ -618,5 +679,6 @@ int main(int argc, char *argv[]) {
     }
     free(data);
     free(ssaa_data);
+    MPI_Finalize();
     return 0;
 }

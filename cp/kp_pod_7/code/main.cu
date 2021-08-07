@@ -350,9 +350,7 @@ void ssaa_cpu(uchar4 *src, uchar4 *out, int w, int h, int wScale, int hScale) {
 
     for(y = 0; y < h; y += 1) {
         for(x = 0; x < w; x += 1) {
-
             s = make_uint4(0,0,0,0);
-
             for (i = 0; i < wScale; ++i) {
                 for (j = 0; j < hScale; ++j){
                     p = src[ w * wScale * (y * hScale + j) + (x * wScale + i) ];
@@ -364,7 +362,6 @@ void ssaa_cpu(uchar4 *src, uchar4 *out, int w, int h, int wScale, int hScale) {
             s.x /= n;
             s.y /= n;
             s.z /= n;
-
             out[y * w + x] = make_uchar4(s.x, s.y, s.z, s.w);
         }
     }
